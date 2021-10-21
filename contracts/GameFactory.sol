@@ -18,6 +18,7 @@ contract GameFactory is Ownable {
     bytes32[] private gameIds;
 
     event LogGameId(bytes32 gameId);
+    event betOutput(bool);
 
     modifier isCurrentPlayerNotHost(bytes32 _id){
         require(msg.sender!=gameTable[_id].host, 'You cannot join your own game!');
@@ -114,10 +115,12 @@ contract GameFactory is Ownable {
 
     function betPreviousScore(bytes32 _gameId, uint _score, uint _stake) public gameExist(_gameId) {
 
-        if (gameTable[_gameId].score!=_score) { 
-            sendStakeToWinner(payable(msg.sender), _stake);
-        } else {
+        if (gameTable[_gameId].score==_score) { 
             sendStakeToWinner(payable(address(this)), _stake);
+            emit betOutput(true);
+        } else {
+            sendStakeToWinner(payable(msg.sender), _stake);
+            emit betOutput(false);
         }
     }
 
