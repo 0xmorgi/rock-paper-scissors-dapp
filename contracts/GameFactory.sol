@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract GameFactory is Ownable {
 
-    enum figure {UNDECLARED,ROCK,PAPER,SCISSORS}
+    enum figure {UNDECLARED,ROCK,PAPER,SCISSORS,FIGURES_COUNT}
     enum gameScore {UNDECLARED,WIN,LOSE,DRAW}
     
     uint256 private gameCreationCounter;
@@ -24,6 +24,16 @@ contract GameFactory is Ownable {
         _;
     }
 
+    modifier gameExist(bytes32 _id){
+        require(msg.sender!=gameTable[_id].host, 'Game does not exist.');
+        _;
+    }
+    
+    modifier figureExist(uint _figure){
+        require(_figure >= 1 && _figure <= uint(figure.FIGURES_COUNT), 'There is no figure coresponding to this number');
+        _;
+    }
+
     struct Game {
         address payable host;
         address payable guest;
@@ -33,7 +43,7 @@ contract GameFactory is Ownable {
         uint stake;
     }
 
-    function createGame(address payable host,uint8 hostFigure, uint initialStake) public {
+    function createGame(address payable host,uint8 hostFigure, uint initialStake) public figureExist(hostFigure) {
         require(address(msg.sender).balance>=gameFee+initialStake,'Not enought ETH to create a game!');
         gameCreationCounter++;
         bytes32 gameId = generateId();
@@ -47,7 +57,7 @@ contract GameFactory is Ownable {
         return keccak256(abi.encodePacked(msg.sender,block.timestamp,gameCreationCounter));
     }
 
-    function joinAndPlayGame(bytes32 _id, uint8 _guestFigure, uint _stake) public isCurrentPlayerNotHost(_id) {
+    function joinAndPlayGame(bytes32 _id, uint8 _guestFigure, uint _stake) public isCurrentPlayerNotHost(_id) figureExist(_guestFigure) gameExist(_id) {
         require(address(msg.sender).balance>=gameFee+_stake,'Not enought ETH to play a game!');
         gameScore currentGameScore;
         uint sumamrizedStake = gameTable[_id].stake+_stake;
@@ -66,7 +76,7 @@ contract GameFactory is Ownable {
 
     }
 
-    function deleteGame(bytes32 _id) public {
+    function deleteGame(bytes32 _id) public gameExist(_id) {
         require(msg.sender==gameTable[_id].host,'Only game host is allowed to detele game.');
         address payable _gameOwner = gameTable[_id].host;
         _gameOwner.transfer(gameTable[_id].stake);
@@ -100,6 +110,15 @@ contract GameFactory is Ownable {
 
     function getGameInfo(bytes32 _gameId) public onlyOwner view returns (Game memory) {
         return gameTable[_gameId];
+    }
+
+    function betPreviousScore(bytes32 _gameId, uint _score, uint _stake) public gameExist(_gameId) {
+
+        if (gameTable[_gameId].score!=_score) { 
+            sendStakeToWinner(payable(msg.sender), _stake);
+        } else {
+            sendStakeToWinner(payable(address(this)), _stake);
+        }
     }
 
 
